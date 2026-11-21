@@ -6,7 +6,7 @@
 
 ## Overview
 
-You might wonder why a student in Rotterdam named this project `tokyo-engine`. Surprise, surprise: the matching engines for Asian crypto perpetuals sit in Tokyo, and trying to win maker queue priority from a Dutch laptop is a losing game—so the daemon runs 24/7 on a Tokyo (`ap-northeast-1`) VPS.
+You might wonder why a student in Rotterdam named this project `tokyo-engine`. Surprise, surprise: the matching engines for Asian crypto perpetuals sit in Tokyo, and trying to win maker queue priority from a Dutch laptop is a losing game, so the daemon runs 24/7 on a Tokyo (`ap-northeast-1`) VPS.
 
 `tokyo-engine` is an event-driven research framework and live execution daemon built to model, validate, and trade synchronized cross-sectional mean-reversion across 12 liquid crypto perpetual futures. Rather than treating backtesting and execution as separate worlds, the pipeline explicitly models **execution friction, adverse selection, and slippage** over an **8.3-month dataset** (Feb–Oct 2026, 253.6 trading days).
 
@@ -24,7 +24,7 @@ All results are evaluated across fixed H1 (Feb–Jun 2026) and H2 (Jun–Oct 202
 | **Stage 2** — + Non-Losing 2nd Tranche Scaling | 8.3M | 203 | 99 | 55.2% | +0.300R | +2.49 ** | 1.68 | +21.15R | +39.77R | **+60.92R** | 13.85R | 4.40 |
 | **Stage 3** — + Climax Absorption Filter | 8.3M | 233 | 113 | 54.9% | +0.303R | +2.60 *** | 1.69 | +23.44R | +47.24R | **+70.68R** | 14.41R | 4.90 |
 
-> **Bootstrap Robustness:** Non-parametric cluster-block bootstrapping (5,000x) for **Stage 3** yields $\mathbb{P}(\sum R > 0) = 99.46\%$.
+>  **Methodological Notes:** In **Stage 2**, non-losing 2nd tranches are logged as independent positions with their own exit brackets; all portfolio returns remain normalized to $1.00R$ average risk per trade. Non-parametric cluster-block bootstrapping (5,000x) for **Stage 3** yields $\mathbb{P}(\sum R > 0) = 99.46\%$.
 
 ---
 
@@ -62,7 +62,10 @@ Standard i.i.d. $t$-statistics severely overstate significance in crypto markets
 The production daemon runs 24/7 on Tokyo (`ap-northeast-1`) VPS infrastructure (~2–12 ms RTT to the Asian API gateway), decoupling heavy historical feature computation from the real-time execution path:
 
 * **Two-Stage Incremental Pipeline (`<3 ms` Decision Hot-Path):** A background worker thread (`asyncio.to_thread`) pre-computes rolling multi-timeframe indicator states on closed bars, allowing the live forming bar to be evaluated incrementally in sub-3ms right before candle close.
-* **Active L1 BBO Order Chaser:** Rather than firing naive market orders on candle close, the daemon maintains a dedicated L1 best-bid-offer WebSocket feed (`uvloop`, keep-alive TLS sessions, token-bucket rate limiters). It places spread-aware `POST_ONLY` limit orders, recovers immediately from spread-cross rejects, dynamically re-pegs on price drift, tracks partial fills, and sweeps only the unfilled remainder via an `IOC` fallback (guarded by a flash-spike circuit breaker).
+* **Active L1 BBO Order Chaser:** Rather than firing naive market orders on candle close, the daemon manages entries through a three-step execution loop over a dedicated L1 best-bid-offer WebSocket feed (`uvloop`, keep-alive TLS, token-bucket rate limiters):
+  1. **Spread-Aware Entry:** Places passive `POST_ONLY` limit orders just ahead of candle close to capture maker fees and queue priority.
+  2. **Dynamic Re-Pegging:** Catches immediate spread-cross rejects, re-pegs resting orders on price drift, and accounts for partial fills in real time.
+  3. **Deterministic Fallback:** Sweeps only the unfilled remainder via an `IOC` taker order if the passive window expires, guarded by a flash-spike circuit breaker.
 * **Telemetry & Crash Recovery:** Persists atomic JSON state snapshots (per-tranche position reconciliation), SQLite WAL-mode trade logs, and per-gate audit trails for live-vs-backtest slippage attribution.
 * **Tech Stack:** Python 3.12, `asyncio`, `uvloop`, `websockets`, `aiohttp`, NumPy, Pandas, SciPy, SQLite (WAL).
 
