@@ -6,15 +6,15 @@
 
 ## Overview
 
-`tokyo-engine` is an event-driven research framework and live execution daemon built to model, validate, and trade synchronized cross-sectional mean-reversion across liquid crypto perpetual futures.
+You might wonder why a student in Rotterdam named this project `tokyo-engine`. Surprise, surprise: the matching engines for Asian crypto perpetuals sit in Tokyo, and trying to win maker queue priority from a Dutch laptop is a losing game—so the daemon runs 24/7 on a Tokyo (`ap-northeast-1`) VPS.
 
-Rather than treating backtesting and live execution as separate stages, the project integrates **order-book microstructure, adverse selection, and regime shifts** directly into the statistical validation pipeline over an **8.3-month dataset** (Feb–Oct 2026, 253.6 trading days).
+`tokyo-engine` is an event-driven research framework and live execution daemon built to model, validate, and trade synchronized cross-sectional mean-reversion across 12 liquid crypto perpetual futures. Rather than treating backtesting and execution as separate worlds, the pipeline explicitly models **execution friction, adverse selection, and slippage** over an **8.3-month dataset** (Feb–Oct 2026, 253.6 trading days).
 
 ---
 
 ## 1. Empirical Ablation & Walk-Forward Performance
 
-The table below shows the final synthesis of a 26-phase research process. Earlier phases focused on isolating the core market mechanism, falsifying naive assumptions (Section 2), and fixing base indicator parameters ex-ante ($df_{\text{ind}} = 0$). Each row adds one structural component to the baseline to isolate its exact marginal impact.
+The table below shows the final synthesis of a 26-phase research process on the 12-asset core universe. Earlier phases focused on isolating the core market mechanism, falsifying naive assumptions (Section 2), and freezing base indicator parameters ex-ante ($df_{\text{ind}} = 0$). Each row adds one structural component to the baseline to isolate its exact marginal impact.
 
 All results are evaluated across fixed H1 (Feb–Jun 2026) and H2 (Jun–Oct 2026) calendar windows, net of VIP taker/maker fees and conservative stop-loss slippage, normalized to $1.00R$ average risk per trade:
 
@@ -23,9 +23,8 @@ All results are evaluated across fixed H1 (Feb–Jun 2026) and H2 (Jun–Oct 202
 | **Stage 1** — Core Synchronized Baseline | 8.3M | 147 | 78 | 55.8% | +0.341R | +2.64 *** | 1.83 | +18.12R | +32.01R | **+50.13R** | 12.10R | 4.14 |
 | **Stage 2** — + Non-Losing 2nd Tranche Scaling | 8.3M | 203 | 99 | 55.2% | +0.300R | +2.49 ** | 1.68 | +21.15R | +39.77R | **+60.92R** | 13.85R | 4.40 |
 | **Stage 3** — + Climax Absorption Filter | 8.3M | 233 | 113 | 54.9% | +0.303R | +2.60 *** | 1.69 | +23.44R | +47.24R | **+70.68R** | 14.41R | 4.90 |
-| **Stage 4** — + High-Beta Universe Expansion* | 8.3M | 286 | 138 | 56.3% | +0.330R | +3.32 *** | 1.77 | +22.83R | +71.50R | **+94.34R** | 15.25R | 6.18 |
 
-> **Universe Coverage Note:** The 12-asset core universe spans the full 8.3-month dataset (H1 + H2). The 8 high-beta expansion assets (screened ex-ante via a rolling volatility floor) are available in the local dataset from June 22, 2026 onward, contributing exclusively to H2. Non-parametric cluster-block bootstrapping (5,000x) for **Stage 4** yields $\mathbb{P}(\sum R > 0) = 99.94\%$.
+> **Bootstrap Robustness:** Non-parametric cluster-block bootstrapping (5,000x) for **Stage 3** yields $\mathbb{P}(\sum R > 0) = 99.46\%$.
 
 ---
 
@@ -36,9 +35,8 @@ Most textbook trading assumptions break down under correlated liquidity shocks a
 | Tested Hypothesis | Why It Failed | Empirical Evidence | Resolution |
 |---|---|---|---|
 | **Standardized Z-Score Triggers** | During quiet consolidations, shrinking rolling variance causes premature entries on the very first bar of a real trend breakout (covariate shift). | $-76.27R$ loss ($27.2\%$ WR) during the March 2026 regime shift. | Added ex-ante trend-displacement and volatility-normalized over-extension filters. |
-| **Pure Passive (`POST_ONLY`) Execution** | Severe adverse selection: 100% fill rate on losing breakouts, while missing fills on rapid V-shape bounces. | Up to 60 missed winners in 4M stress test; WR dropped from $58.5\%$ to $52.5\%$ ($t_{\text{Clust}}: 3.06 \to 2.43$). | Built a **hybrid router**: passive BBO order chasing prior to bar close with a deterministic taker (`IOC`) fallback. |
-| **Single-Asset Signals** | Isolated spikes usually reflect asset-specific news or liquidation cascades rather than market-wide mean reversion. | $40.2\%$ WR, $\sum R = -41.03R$ across $N = 316$ isolated signals. | Required directional, synchronous multi-asset co-jumps anchored to liquid core pairs. |
-| **Asynchronous / Dense Time Sampling** | Triggering on misaligned or overly dense minute offsets causes false confirmation and prematurely fills portfolio slots during shocks. | Asynchronous pairs yielded $20.0\%$ WR ($\sum R = -22.35R$); dense sampling collapsed Calmar from $4.90$ to $0.52$. | Restricted macro sampling strictly to non-overlapping, orthogonal time grids. |
+| **Pure Passive (`POST_ONLY`) Execution** | Severe adverse selection: 100% fill rate on losing breakouts, while missing fills on rapid V-shape bounces. | Up to 60 missed winners in 4M stress test; WR dropped from $58.5\%$ to $52.5\%$ ($t_{\text{Clust}}: 3.06 \to 2.43$). | Built a **hybrid router** that actively chases L1 BBO prior to bar close with a deterministic `IOC` taker fallback. |
+| **Single-Asset Signals** | Isolated spikes usually reflect asset-specific news or liquidation cascades rather than market-wide mean reversion. | $40.2\%$ WR, $\sum R = -41.03R$ across $N = 316$ isolated signals. | Required directional, synchronous multi-asset co-jumps across liquid core pairs. |
 | **Breakeven Stop Locks** | Moving stops to breakeven mid-trade clips legitimate winners during normal price retests. | 16 winning trades stopped at $0.00R$; total return dropped from $+70.68R$ to $+65.82R$. | Kept a single-stage dynamic mean-reversion target paired with a fixed time-stop. |
 
 ---
@@ -61,10 +59,10 @@ Standard i.i.d. $t$-statistics severely overstate significance in crypto markets
 
 ## 4. Live Execution Architecture
 
-Deployed on low-latency Tokyo (`ap-northeast-1`) VPS infrastructure, the live daemon decouples historical feature computation from the real-time execution path:
+The production daemon runs 24/7 on Tokyo (`ap-northeast-1`) VPS infrastructure (~2–12 ms RTT to the Asian API gateway), decoupling heavy historical feature computation from the real-time execution path:
 
-* **Two-Stage Incremental Pipeline (`<3 ms` Decision Hot-Path):** A background worker thread (`asyncio.to_thread`) pre-computes rolling multi-timeframe indicator states and volatility screens on closed bars, allowing the live forming bar to be evaluated incrementally in sub-3ms before dispatching concurrent orders.
-* **L1 BBO Order Chaser & Rate-Limited Engine:** Maintains a dedicated L1 best-bid-offer WebSocket feed alongside 1-minute ringbuffers (`uvloop`, keep-alive TLS sessions, token-bucket rate limiters). Manages spread-aware `POST_ONLY` orders with fast-reject recovery, partial-fill accounting, and deterministic `IOC` fallback.
+* **Two-Stage Incremental Pipeline (`<3 ms` Decision Hot-Path):** A background worker thread (`asyncio.to_thread`) pre-computes rolling multi-timeframe indicator states on closed bars, allowing the live forming bar to be evaluated incrementally in sub-3ms right before candle close.
+* **Active L1 BBO Order Chaser:** Rather than firing naive market orders on candle close, the daemon maintains a dedicated L1 best-bid-offer WebSocket feed (`uvloop`, keep-alive TLS sessions, token-bucket rate limiters). It places spread-aware `POST_ONLY` limit orders, recovers immediately from spread-cross rejects, dynamically re-pegs on price drift, tracks partial fills, and sweeps only the unfilled remainder via an `IOC` fallback (guarded by a flash-spike circuit breaker).
 * **Telemetry & Crash Recovery:** Persists atomic JSON state snapshots (per-tranche position reconciliation), SQLite WAL-mode trade logs, and per-gate audit trails for live-vs-backtest slippage attribution.
 * **Tech Stack:** Python 3.12, `asyncio`, `uvloop`, `websockets`, `aiohttp`, NumPy, Pandas, SciPy, SQLite (WAL).
 
