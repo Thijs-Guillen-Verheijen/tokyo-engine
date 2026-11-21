@@ -1,34 +1,72 @@
-# tokyo-engine: Systematic Market Microstructure & DGP Validation
+# tokyo-engine: Systematic Market Microstructure & Econometric Validation
 
-**Note:** *This repository serves as a methodological overview of a proprietary econometric research project and live execution telemetry daemon. The underlying Python engine, order-routing logic, and specific alpha parameters are kept private.*
-
-## Overview
-`tokyo-engine` is a systematic research framework designed to model, test, and execute directional mean-reversion and co-jump behavior across crypto perpetual futures. The primary focus is strict econometric rigor: treating market microstructure, latency, and regime-shifts as integral parts of the statistical validation process.
-
-## 1. Econometric Rigor & Out-of-Sample Validation
-Standard $t$-statistics fail in highly correlated cross-sectional markets. This framework enforces severe constraints over an 8.3-month dataset to prevent curve-fitting and false discoveries:
-
-*   **Time-Clustered Inference:** Significance is evaluated using Rogers time-clustered standard errors, grouping concurrent trades into independent 9-minute clusters to measure true edge.
-
-$$
-\text{Var}_{\text{Clust}}(\bar{y}) = \frac{G}{G-1} \cdot \frac{1}{N^2} \sum_{g=1}^{G} \left( \sum_{i \in g} (y_i - \bar{y}) \right)^2, \quad t_{\text{Clust}} = \frac{\bar{y}}{\sqrt{\text{Var}_{\text{Clust}}(\bar{y})}}
-$$
-
-*   **Non-Parametric Block Bootstrapping:** System robustness is verified through 5,000x cluster-block bootstrapping to establish strict confidence intervals for the expected value ($\mathbb{E}[R]$) and maximum drawdown.
-*   **Fixed Walk-Forward Splits:** The dataset relies on strict chronological boundaries rather than sample-median splits, preventing the contamination of in-sample data by extreme volatility regimes (e.g., the March 2026 crash).
-
-## 2. Microstructure & Falsified Hypotheses
-An unexecuted signal is merely a hypothesis. Through iterative execution telemetry, several retail-level assumptions were falsified and physically corrected:
-
-*   **Latent Covariate Shift (Denominator Compression):** Early iterations suffered during sudden market consolidations due to a tightening variance $\sigma_{60}$ triggering premature $Z$-score entries. This was resolved by implementing a physical 30-minute slope and $\text{ATR}_{14}$ extension gate ex-ante.
-*   **Adverse Selection in Pure Maker Execution:** Relying exclusively on passive `POST_ONLY` orders resulted in a 100% fill-rate on losing trades, but significant missed fills on rapid V-shape recoveries.
-*   **AS4 Hybrid Order Routing:** The production architecture solves this through a hybrid execution model, deploying a smart `POST_ONLY` chaser at $T-2.0\text{s}$ with an automated taker-fallback at $T+1.5\text{s}$ based on queue-penetration metrics.
-
-## 3. Production Architecture
-The live telemetry daemon (`live_m26_daemon.py`) is engineered for sub-100ms latency out of Tokyo/Singapore VPS infrastructure, featuring:
-*   **Asynchronous Feature Building:** Vectorized calculation of all 9-minute and 1-minute state-features across a 20-symbol universe.
-*   **L1 BBO Smart Chasing:** Real-time best-bid-offer tracking to dynamically re-peg resting orders before candle-close.
-*   **Tech Stack:** `Python 3.12`, `asyncio`, `uvloop`, `websockets`, `Pandas`, `NumPy`.
+> **Note:** This repository documents the econometric methodology, empirical falsification log, and production architecture of a proprietary quantitative research framework and live execution daemon (`live_m26_daemon.py`). To protect proprietary alpha, the underlying signal generation, exact indicator thresholds, and order-routing source code are kept private.
 
 ---
-*Author: Thijs Guillén Verheijen — BSc Econometrics & Operations Research, Erasmus School of Economics*
+
+## Overview
+
+`tokyo-engine` is an event-driven research and execution framework built to model, statistically validate, and execute synchronized cross-sectional mean-reversion and co-jump dynamics across liquid crypto perpetual futures. 
+
+Rather than treating backtesting and live execution as separate stages, the framework integrates **order-book microstructure, queue-penetration dynamics, and non-stationary regime shifts** directly into the statistical inference pipeline over an **8.3-month walk-forward dataset** (Feb–Oct 2026, $253.6$ trading days).
+
+---
+
+## 1. Econometric Inference & Validation Protocol
+
+Standard i.i.d. $t$-statistics severely overstate significance in correlated cross-sectional crypto markets where multiple assets trigger simultaneously during liquidity shocks. To mitigate data-snooping and false discoveries, all base indicator parameters are frozen ex-ante ($df_{\text{ind}} = 0$, no grid-searches), while structural regime gates are evaluated via strict chronological ablation:
+
+* **Rogers / Cameron–Gelbach–Miller Time-Clustered Inference:** Trades are grouped into non-overlapping 9-minute chronological clusters $g \in \{1, \dots, G\}$ to account for cross-sectional correlation:
+  $$\widehat{\text{Var}}_{\text{Clust}}(\bar{y}) = \frac{G}{G - 1} \cdot \frac{1}{N^2} \sum_{g=1}^{G} \left( \sum_{i \in g} (y_i - \bar{y}) \right)^2, \qquad t_{\text{Clust}} = \frac{\bar{y}}{\sqrt{\widehat{\text{Var}}_{\text{Clust}}(\bar{y})}}$$
+* **Non-Parametric Cluster-Block Bootstrapping:** Strategy robustness is stress-tested via $5{,}000\times$ resampling with replacement at the *cluster* level ($G$ blocks) to derive empirical confidence intervals for $\mathbb{E}[R]$, Profit Factor, and maximum drawdown.
+* **Fixed Chronological Regime Splits:** Datasets are split strictly on fixed UTC calendar dates (H1: Feb–Jun 2026 vs. H2: Jun–Oct 2026) rather than sample-median timestamps (`entry_time.median()`), preventing subtle look-ahead contamination across shifting volatility regimes. H1 initially served as an out-of-sample stress test that exposed latent covariate shift during the March 2026 crash, motivating the ex-ante physical extension gates documented below.
+* **Cluster-Level i.i.d. Verification & Risk-Shield Ablation:** Wald–Wolfowitz runs tests ($Z = +0.14, p = 0.8849$) and Ljung–Box ARCH tests ($Q(5)_{R^2} = 0.31, p = 0.9975$) on purified co-jump clusters confirmed serial independence of cluster outcomes—empirically refuting post-loss drawdown scaling shields in favor of constant $1.00\times$ base risk allocation.
+
+---
+
+## 2. Empirical Ablation & Walk-Forward Performance (8.3 Months)
+
+All results below are evaluated net of VIP taker/maker fees and conservative stop-loss slippage, normalized to $1.00R$ average risk per trade across fixed H1 (Feb–Jun 2026) and H2 (Jun–Oct 2026) windows:
+
+| Model Stage / Execution Architecture | Window | $N_{\text{Tr}}$ | $G_{\text{Cl}}$ | $\text{WR}\%$ | $\mathbb{E}[R]_{1R}$ | $t_{\text{Clust}}$ | $\text{PF}$ | $\sum R_{\text{H1}}$ | $\sum R_{\text{H2}}$ | $\sum R_{\text{Tot}}$ | $\text{DD}_{1R}$ | $\text{Calmar}_{1R}$ |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| **M25.0** — Core Orthogonal 3-Grid Baseline | 8.3M | 147 | 78 | 55.8% | +0.341R | +2.64 *** | 1.83 | +18.12R | +32.01R | **+50.13R** | 12.10R | 4.14 |
+| **M25.3** — + Non-Losing Orthogonal 2nd Tranche | 8.3M | 203 | 99 | 55.2% | +0.300R | +2.49 ** | 1.68 | +21.15R | +39.77R | **+60.92R** | 13.85R | 4.40 |
+| **M25.4** — + Absorbed Climax Gate (`U12` Core) | 8.3M | 233 | 113 | 54.9% | +0.303R | +2.60 *** | 1.69 | +23.44R | +47.24R | **+70.68R** | 14.41R | 4.90 |
+| **M26.1a** — + `U12`-Anchored High-Beta Expansion* | 8.3M | 286 | 138 | 56.3% | +0.330R | +3.32 *** | 1.77 | +22.83R | +71.50R | **+94.34R** | 15.25R | 6.18 |
+
+*\*Note on Universe Coverage: The core `U12` universe spans the full 8.3-month dataset (H1 + H2). The 8 high-beta expansion symbols (`EXTRA_8`, governed by an ex-ante 7-day rolling volatility gate $\ge 14.0\text{ bps}$) are available in the local cache from June 22, 2026 onward, contributing exclusively to H2. Cluster-block bootstrap ($5{,}000\times$) for **M26.1a** yields $\mathbb{P}(\sum R > 0) = 99.94\%$.*
+
+---
+
+## 3. Microstructure Findings & Falsified Hypotheses
+
+A core principle of this repository is documenting **what failed under regime and execution stress-testing** before capital deployment:
+
+| Tested Hypothesis | Empirical Failure Mode | Empirical Evidence | Architectural Resolution |
+|---|---|---|---|
+| **Latent Covariate Shift (Unfiltered Z-Scores)** | Tightening rolling variance ($\sigma_{60}$) during low-volatility consolidations triggers premature Z-score entries on bar 1 of trend breakouts. | $-76.27R$ loss ($27.2\%$ WR) during the March 2026 H1 regime shift. | Enforced ex-ante 30m SMA displacement and physical $\text{ATR}_{14}$ over-extension gates. |
+| **Pure Passive `POST_ONLY` Execution** | Severe adverse selection: $100\%$ fill rate on losing breakouts, but missed fills on rapid V-shape mean-reversion bounces. | Up to $60$ missed winners in 4M stress test; WR dropped from $58.5\%$ to $52.5\%$ ($t_{\text{Clust}}: 3.06 \to 2.43$). | Built **AS4 Hybrid Routing**: BBO-pegged `POST_ONLY` chaser at $T - 2.0\text{s}$ with deterministic `IOC` taker fallback at $T + 1.5\text{s}$. |
+| **Isolated Single-Asset Triggers ($W = 1$)** | Idiosyncratic liquidity shocks reflect asset-specific news/liquidation cascades rather than market-wide mean reversion. | $40.2\%$ WR, $\sum R = -41.03R$ across $N = 316$ isolated signals. | Required directional, same-grid synchronous co-jumps ($W_{\text{single}}^{(\phi)} \ge 2$) anchored to core liquid pairs. |
+| **Asynchronous Cross-Grid Co-Jumps** | Counting co-jumps across misaligned 9m phase offsets ($\phi_1 \neq \phi_2$) introduces false confirmation. | $20.0\%$ WR across both H1 & H2 ($\sum R = -22.35R, t_{\text{Clust}} = -3.54$). | Restricted macro discretization strictly to orthogonal 3-minute grids ($\phi \in \{0, 3, 6\}$). |
+| **9-Phase Dense Discretization ($\phi \in \{0..8\}$)** | Non-divisible minute offsets cannibalize portfolio slots prematurely on minute 1 of structural shocks. | 4M Taker $\sum R$ dropped from $+51.86R$ to $+16.89R$; 8.3M $\text{Calmar}_{1R}$ collapsed from $4.90$ to $0.52$. | Locked orthogonal 3-grid rotation ($\phi \in \{0, 3, 6\}$). |
+| **Mid-Trade Breakeven Stop Locks** | Tightening stops to breakeven at $70\%$ of TP distance clips legitimate winners during normal retests. | $16$ winning trades stopped at $0.00R$; 8.3M $\sum R$ dropped from $+70.68R$ to $+65.82R$. | Maintained single-stage $\text{SMA}_{60}$-bounded TP with a 60-minute smart-bracket time-stop. |
+
+---
+
+## 4. Production Architecture (`live_m26_daemon.py`)
+
+Deployed on low-latency Tokyo (`ap-northeast-1`) VPS infrastructure for perpetual futures execution, the production daemon separates heavy historical feature computation from the real-time execution path:
+
+* **Two-Stage Incremental Feature Pipeline (`<3 ms` Decision Hot-Path):**
+  * **Background State Caching (`:10.0s`):** A worker thread (`asyncio.to_thread`) pre-computes rolling 9-minute Wilder RSI/StochRSI states, $\text{ATR}_{14}$ baselines, and 7-day rolling volatility screens across a 20-symbol universe on closed bars.
+  * **O(1) Scalar Hot-Path (`:58.0s`):** At $T - 2.0\text{s}$ prior to candle close, only the forming 1-minute bar is evaluated incrementally in sub-3ms before dispatching concurrent orders.
+* **L1 BBO Smart Order Chaser & Rate-Limited REST/WS Engine:**
+  * Maintains a dedicated L1 best-bid-offer feed alongside 1-minute kline ringbuffers (`uvloop` event loop, keep-alive TLS sessions, and token-bucket rate limiters).
+  * Places spread-aware `POST_ONLY` limit orders with $60\text{ ms}$ fast-reject recovery, partial-fill accounting, and deterministic `IOC` fallback at $T + 1.5\text{s}$.
+* **White-Box Telemetry & Crash Recovery:** Persists atomic JSON state snapshots (`positionId` reconciliation for hedge-mode tranches), SQLite WAL-mode trade logs, and per-gate audit trails for live-vs-backtest slippage attribution.
+* **Tech Stack:** Python 3.12, `asyncio`, `uvloop`, `websockets`, `aiohttp`, NumPy, Pandas, SciPy, SQLite (WAL).
+
+---
+
+**Author:** Thijs Guillén Verheijen — BSc Econometrics & Operations Research, Erasmus School of Economics
