@@ -1,4 +1,4 @@
-# tokyo-engine: Systematic Market Microstructure & Econometric Validation
+# tokyo-engine: Systematic Mean-Reversion & Execution Engine
 
 > **Note:** This repository summarizes the econometric methodology, falsified hypotheses, and live execution architecture of a personal quantitative trading project. Because the system is actively traded live, the signal generation code, exact parameters, and order-routing logic are kept private.
 
