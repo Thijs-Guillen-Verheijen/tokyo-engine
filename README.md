@@ -27,4 +27,4 @@ The live telemetry daemon (`live_m26_daemon.py`) is engineered for sub-100ms lat
 *   **Tech Stack:** `Python 3.12`, `asyncio`, `uvloop`, `websockets`, `Pandas`, `NumPy`.
 
 ---
-*Author: [Jouw Naam] — BSc Econometrics & Operations Research, Erasmus School of Economics*
+*Author: Thijs Guillén Verheijen — BSc Econometrics & Operations Research, Erasmus School of Economics*
