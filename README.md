@@ -9,10 +9,10 @@
 Standard $t$-statistics fail in highly correlated cross-sectional markets. This framework enforces severe constraints over an 8.3-month dataset to prevent curve-fitting and false discoveries:
 
 *   **Time-Clustered Inference:** Significance is evaluated using Rogers time-clustered standard errors, grouping concurrent trades into independent 9-minute clusters to measure true edge:
-    
-    $$
+
+    ```math
     \text{Var}_{\text{Clust}}(\bar{y}) = \frac{G}{G-1} \cdot \frac{1}{N^2} \sum_{g=1}^{G} \left( \sum_{i \in g} (y_i - \bar{y}) \right)^2, \quad t_{\text{Clust}} = \frac{\bar{y}}{\sqrt{\text{Var}_{\text{Clust}}(\bar{y})}}
-    $$
+    ```
 
 *   **Non-Parametric Block Bootstrapping:** System robustness is verified through 5,000x cluster-block bootstrapping to establish strict confidence intervals for the expected value ($\mathbb{E}[R]$) and maximum drawdown.
 *   **Fixed Walk-Forward Splits:** The dataset relies on strict chronological boundaries rather than sample-median splits, preventing the contamination of in-sample data by extreme volatility regimes (e.g., the March 2026 crash).
