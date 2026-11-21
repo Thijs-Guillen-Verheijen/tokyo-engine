@@ -12,9 +12,11 @@ Rather than treating backtesting and live execution as separate stages, the proj
 
 ---
 
-## 1. Empirical Ablation & Walk-Forward Performance (8.3 Months)
+## 1. Final Synthesis & Walk-Forward Performance (Phases 25–26)
 
-All results below are evaluated net of VIP taker/maker fees and conservative stop-loss slippage, normalized to $1.00R$ average risk per trade across fixed H1 (Feb–Jun 2026) and H2 (Jun–Oct 2026) calendar windows:
+The table below does not represent isolated backtests, but the **final architectural synthesis (Phases 25–26)** of a 26-phase empirical research pipeline. Phases 1–24 focused on isolating the core Data Generating Process (DGP), falsifying microstructure assumptions (see Section 2), diagnosing the March 2026 regime shift, and freezing base indicator parameters ($df_{\text{ind}} = 0$).
+
+All results are evaluated over the full 8.3-month dataset (H1: Feb–Jun 2026 vs. H2: Jun–Oct 2026), net of VIP taker/maker fees and conservative stop-loss slippage, normalized to $1.00R$ average risk per trade:
 
 | Model Stage / Execution Architecture | Window | $N_{\text{Tr}}$ | $G_{\text{Cl}}$ | $\text{WR}\%$ | $\mathbb{E}[R]_{1R}$ | $t_{\text{Clust}}$ | $\text{PF}$ | $\sum R_{\text{H1}}$ | $\sum R_{\text{H2}}$ | $\sum R_{\text{Tot}}$ | $\text{DD}_{1R}$ | $\text{Calmar}_{1R}$ |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -23,7 +25,7 @@ All results below are evaluated net of VIP taker/maker fees and conservative sto
 | **M25.4** — + Absorbed Climax Gate (`U12` Core) | 8.3M | 233 | 113 | 54.9% | +0.303R | +2.60 *** | 1.69 | +23.44R | +47.24R | **+70.68R** | 14.41R | 4.90 |
 | **M26.1a** — + `U12`-Anchored High-Beta Expansion* | 8.3M | 286 | 138 | 56.3% | +0.330R | +3.32 *** | 1.77 | +22.83R | +71.50R | **+94.34R** | 15.25R | 6.18 |
 
-*\*Universe Coverage Note: The core `U12` universe spans the full 8.3-month dataset (H1 + H2). The 8 high-beta expansion symbols (`EXTRA_8`, filtered ex-ante via a 7-day rolling volatility gate $\ge 14.0\text{ bps}$) are available in the local cache from June 22, 2026 onward, contributing exclusively to H2. Cluster-block bootstrapping ($5{,}000\times$) for **M26.1a** yields $\mathbb{P}(\sum R > 0) = 99.94\%$.*
+> **Universe Coverage Note:** The core `U12` universe spans the full 8.3-month dataset (H1 + H2). The 8 high-beta expansion symbols (`EXTRA_8`, filtered ex-ante via a 7-day rolling volatility gate $\ge 14.0\text{ bps}$) are available in the local cache from June 22, 2026 onward, contributing exclusively to H2. Cluster-block bootstrapping (5,000x) for **M26.1a** yields $\mathbb{P}(\sum R > 0) = 99.94\%$.
 
 ---
 
