@@ -1,6 +1,6 @@
 # tokyo-engine
 
-> **Note:** This repository documents the methodology, falsified hypotheses, and live execution architecture of a personal quantitative trading system. Signal generation, exact parameters, and order-routing code remain private while the system trades live.
+> **Note:** This repository documents the methodology, falsified hypotheses, and execution architecture of a personal systematic trading project. Signal generation, exact parameters, and order-routing code remain private while the system trades live.
 
 ---
 
@@ -22,7 +22,7 @@ Base indicator lookbacks were fixed ex-ante; structural regime filters were adde
 | **Stage 2** — + Non-Losing 2nd Tranche Scaling | 8.3M | 203 | 99 | 55.2% | +0.300R | +2.49 ** | 1.68 | +21.15R | +39.77R | **+60.92R** | 13.85R | 4.40 |
 | **Stage 3** — + Climax Absorption Filter | 8.3M | 233 | 113 | 54.9% | +0.303R | +2.60 *** | 1.69 | +23.44R | +47.24R | **+70.68R** | 14.41R | 4.90 |
 
-> **Methodological Notes:** In **Stage 2**, non-losing second tranches are logged as independent positions with their own exit brackets while keeping portfolio risk normalized to $1.00R$. Because structural filters were iteratively refined on the Feb–Oct 2026 sample, live deployment serves as the true out-of-sample test. Non-parametric cluster-block bootstrapping (5,000x) for **Stage 3** yields $\mathbb{P}(\sum R > 0) = 99.46\%$.
+> **Methodological Notes:** In **Stage 2**, non-losing second tranches are logged as independent positions with their own exit brackets while keeping portfolio risk normalized to $1.00R$. Structural filters were refined in-sample on the Feb–Oct 2026 dataset, with forward performance tracked via live execution telemetry. Cluster-block bootstrapping (5,000x) for **Stage 3** yields $\mathbb{P}(\sum R > 0) = 99.46\%$.
 
 ---
 
@@ -55,7 +55,7 @@ Standard i.i.d. $t$-statistics overstate significance in crypto because multiple
 
 ---
 
-## 4. Live Execution Architecture
+## 4. Execution Architecture
 
 The daemon runs 24/7 on a Tokyo (`ap-northeast-1`) VPS, decoupling historical feature computation from order dispatch:
 
